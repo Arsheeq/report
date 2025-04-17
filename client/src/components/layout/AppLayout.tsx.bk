@@ -17,14 +17,12 @@ export function AppLayout({ children }: AppLayoutProps) {
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          <a 
-            href="https://www.nubinix.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            www.nubinix.com
-          </a>
+          <button className="text-sm font-medium text-muted-foreground hover:text-foreground">
+            Help
+          </button>
+          <button className="text-sm font-medium text-muted-foreground hover:text-foreground">
+            Settings
+          </button>
         </div>
       </header>
 
@@ -32,22 +30,22 @@ export function AppLayout({ children }: AppLayoutProps) {
       {children}
 
       {/* Footer */}
-      <footer className="border-t py-4 px-6 bg-gradient-to-t from-black to-transparent">
+      <footer className="border-t py-4 px-6">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <NubinixLogo height={24} />
-            <span className="text-sm text-white">
+            <span className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} Nubinix Cloud Insights. All rights reserved.
             </span>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
               Privacy Policy
             </a>
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
               Terms of Service
             </a>
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground">
               Contact Us
             </a>
           </div>
