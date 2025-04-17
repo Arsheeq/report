@@ -1,13 +1,10 @@
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from '@shared/schema';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from "ws";
+import * as schema from "@shared/schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL must be set.");
-}
+neonConfig.webSocketConstructor = ws;
 
-// ESM import of pg with `.then()` — avoids top-level await issues
-const pg = await import('pg');
-const pool = new pg.default.Pool({ connectionString: process.env.DATABASE_URL });
-
-export const db = drizzle(pool, { schema });
-
+const DATABASE_URL = 'postgresql://postgres:postgres@13.232.107.216:5432/nubinix_db';
+export const pool = new Pool({ connectionString: DATABASE_URL });
+export const db = drizzle({ client: pool, schema });
