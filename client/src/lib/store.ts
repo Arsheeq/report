@@ -2,14 +2,27 @@ import { create } from 'zustand';
 import { CloudProvider, ReportType, ReportFrequency, ReportFormat } from '@shared/schema';
 import { Resource } from '@/types';
 
-// Define the steps for the wizard
-export const STEPS = [
+// Define the steps for each report type
+export const BILLING_STEPS = [
+  { id: 'provider', title: 'Provider' },
+  { id: 'reportType', title: 'Report Type' },
+  { id: 'yearMonth', title: 'Period' },
+  { id: 'credentials', title: 'Credentials' },
+  { id: 'generate', title: 'Generate' }
+];
+
+export const UTILIZATION_STEPS = [
   { id: 'provider', title: 'Provider' },
   { id: 'reportType', title: 'Report Type' },
   { id: 'details', title: 'Details' },
   { id: 'frequency', title: 'Frequency' },
   { id: 'generate', title: 'Generate' }
 ];
+
+// Get steps based on report type
+export const getSteps = (type: ReportType | null) => {
+  return type === 'billing' ? BILLING_STEPS : UTILIZATION_STEPS;
+};
 
 // Interface for credentials with account name
 interface CredentialsWithAccountName {
@@ -71,8 +84,9 @@ export const useStore = create<WizardState>((set, get) => ({
 
   // Navigation actions
   nextStep: () => {
-    const { currentStep } = get();
-    if (currentStep < STEPS.length) {
+    const { currentStep, reportType } = get();
+    const steps = getSteps(reportType);
+    if (currentStep < steps.length) {
       set({ currentStep: currentStep + 1 });
     }
   },

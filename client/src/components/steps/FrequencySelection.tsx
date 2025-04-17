@@ -45,9 +45,6 @@ export function FrequencySelection() {
                   <ClockIcon className="h-5 w-5 mr-2 text-primary" />
                   <div>
                     <div className="font-medium">Daily</div>
-                    <div className="text-sm text-muted-foreground">
-                      Generate this report every day
-                    </div>
                   </div>
                 </Label>
               </div>
@@ -61,9 +58,6 @@ export function FrequencySelection() {
                   <CalendarIcon className="h-5 w-5 mr-2 text-primary" />
                   <div>
                     <div className="font-medium">Weekly</div>
-                    <div className="text-sm text-muted-foreground">
-                      Generate this report every week
-                    </div>
                   </div>
                 </Label>
               </div>

@@ -31,3 +31,13 @@
 .group:hover {
   animation: bubble 0.5s ease-in-out;
 }
+
+.nav-button {
+  transition: transform 0.3s ease-in-out;
+}
+
+.nav-button:hover {
+  animation: bubble 0.5s ease-in-out;
+  transform: scale(1.02);
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.2));
+}

@@ -1,14 +1,15 @@
 import { cn } from "@/lib/utils";
 import { useStore } from "@/lib/store";
-import { STEPS } from "@/lib/store";
+import { getSteps } from "@/lib/store";
 import { CheckIcon } from "lucide-react";
 
 export function StepIndicator() {
-  const { currentStep } = useStore();
+  const { currentStep, reportType } = useStore();
+  const steps = getSteps(reportType);
 
   return (
     <div className="w-full flex">
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const stepNumber = index + 1;
         const isActive = stepNumber === currentStep;
         const isCompleted = stepNumber < currentStep;

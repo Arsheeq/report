@@ -7,24 +7,23 @@ import { EnterCredentials } from "@/components/steps/EnterCredentials";
 import { YearMonthSelection } from "@/components/steps/YearMonthSelection";
 import { FrequencySelection } from "@/components/steps/FrequencySelection";
 import { GenerateReport } from "@/components/steps/GenerateReport";
-import { getSteps } from "@/lib/store";
+import { STEPS } from "@/lib/store";
 import { useToast } from "@/hooks/use-toast";
 
 export function StepContent() {
-  const {
-    currentStep,
-    nextStep,
-    prevStep,
-    reportType,
+  const { 
+    currentStep, 
+    nextStep, 
+    prevStep, 
+    reportType, 
     selectedProvider,
     credentials,
     selectedResources,
-    selectAllResources,
-    setSelectAllResources,
-    canProceed,
+    canProceed
   } = useStore();
   const { toast } = useToast();
 
+  // Determine if we can go to next step
   const handleNext = () => {
     if (!canProceed()) {
       toast({
@@ -34,7 +33,7 @@ export function StepContent() {
       });
       return;
     }
-
+    
     nextStep();
   };
 
@@ -45,29 +44,25 @@ export function StepContent() {
       case 2:
         return <SelectReportType />;
       case 3:
+        // Conditional flow based on report type
         if (reportType === "billing") {
           return <YearMonthSelection />;
         } else if (!credentials) {
           return <EnterCredentials />;
         } else {
-          return (
-            <SelectResources
-              selectAllResources={selectAllResources}
-              setSelectAllResources={setSelectAllResources}
-            />
-          );
+          return <SelectResources />;
         }
       case 4:
+        // Conditional flow based on report type
         if (reportType === "billing") {
-          return <EnterCredentials />;
+          if (!credentials) {
+            return <EnterCredentials />;
+          } else {
+            return <FrequencySelection />;
+          }
         } else {
           if (selectedResources.length === 0) {
-            return (
-              <SelectResources
-                selectAllResources={selectAllResources}
-                setSelectAllResources={setSelectAllResources}
-              />
-            );
+            return <SelectResources />;
           } else {
             return <FrequencySelection />;
           }
@@ -79,48 +74,26 @@ export function StepContent() {
     }
   };
 
-  const isEnterCredentialsStep =
-    (currentStep === 3 && !credentials && reportType !== "billing") ||
-    (currentStep === 4 && reportType === "billing");
-
   return (
     <div className="space-y-6">
       {renderStepContent()}
 
       {/* Navigation Buttons */}
-      {!isEnterCredentialsStep && (
-        <div className="flex justify-between mt-10">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-            className="nav-button"
-          >
-            Previous
-          </Button>
-          <Button
-            onClick={handleNext}
-            disabled={currentStep === getSteps(reportType).length}
-            className="nav-button"
-          >
-            {currentStep === getSteps(reportType).length - 1 ? "Generate" : "Next"}
-          </Button>
-        </div>
-      )}
-
-      {/* Previous button only for EnterCredentials step */}
-      {isEnterCredentialsStep && (
-        <div className="flex justify-start mt-10">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStep === 1}
-            className="nav-button"
-          >
-            Previous
-          </Button>
-        </div>
-      )}
+      <div className="flex justify-between mt-10">
+        <Button
+          variant="outline"
+          onClick={prevStep}
+          disabled={currentStep === 1}
+        >
+          Previous
+        </Button>
+        <Button
+          onClick={handleNext}
+          disabled={currentStep === STEPS.length}
+        >
+          {currentStep === STEPS.length - 1 ? "Generate" : "Next"}
+        </Button>
+      </div>
     </div>
   );
 }

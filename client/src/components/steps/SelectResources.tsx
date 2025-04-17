@@ -10,26 +10,17 @@ import { formatResourceId } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export function SelectResources() {
-  const [selectAllEC2, setSelectAllEC2] = useState(false);
-  const [selectAllRDS, setSelectAllRDS] = useState(false);
+  const [selectAll, setSelectAll] = useState(false);
 
-  const handleSelectAllEC2 = () => {
-    setSelectAllEC2(!selectAllEC2);
-    const updatedResources = resources.map(resource => ({
-      ...resource,
-      selected: resource.type === 'ec2' ? !selectAllEC2 : resource.selected
-    }));
-    setResources(updatedResources);
+  const handleSelectAll = () => {
+    setSelectAll(!selectAll);
+    if (selectAll) {
+      setSelectedResources([]);
+    } else {
+      setSelectedResources(resources || []);
+    }
   };
 
-  const handleSelectAllRDS = () => {
-    setSelectAllRDS(!selectAllRDS);
-    const updatedResources = resources.map(resource => ({
-      ...resource,
-      selected: resource.type === 'rds' ? !selectAllRDS : resource.selected
-    }));
-    setResources(updatedResources);
-  };
   const { selectedProvider, selectedResources, setSelectedResources } = useStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("ec2");
@@ -152,7 +143,13 @@ export function SelectResources() {
           {/* Resource table for both tabs */}
           <div className="border rounded-lg overflow-hidden">
             <div className="bg-muted px-4 py-3 text-sm font-medium grid grid-cols-12 gap-4">
-              <div className="col-span-1"></div>
+              <div className="col-span-1">
+                <Checkbox
+                  checked={selectedResources.length === filteredResources.length}
+                  onCheckedChange={handleSelectAll}
+                  className="transition-transform hover:scale-110"
+                />
+              </div>
               <div className="col-span-3">{activeTab === "ec2" ? "Instance ID" : "Instance ID"}</div>
               <div className="col-span-3">{activeTab === "ec2" ? "Name" : ""}</div>
               <div className="col-span-2">Region</div>
