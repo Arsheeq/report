@@ -24,13 +24,14 @@ interface WizardState {
   selectedProvider: CloudProvider | null;
   reportType: ReportType | null;
   credentials: CredentialsWithAccountName | null;
+  resources: Resource[]; // Added resources field
   selectedResources: Resource[];
   reportFrequency: ReportFrequency;
   reportFormat: ReportFormat;
   timeframe: { year: number, month: number } | null;
   emailReport: boolean;
   emailAddress: string;
-  
+
   // Actions
   initialize: () => void;
   nextStep: () => void;
@@ -39,6 +40,7 @@ interface WizardState {
   setSelectedProvider: (provider: CloudProvider) => void;
   setReportType: (type: ReportType) => void;
   setCredentials: (credentials: CredentialsWithAccountName) => void;
+  setResources: (resources: Resource[]) => void; // Added setResources action
   setSelectedResources: (resources: Resource[]) => void;
   setReportFrequency: (frequency: ReportFrequency) => void;
   setReportFormat: (format: ReportFormat) => void;
@@ -56,16 +58,17 @@ export const useStore = create<WizardState>((set, get) => ({
   selectedProvider: null,
   reportType: null,
   credentials: null,
+  resources: [], // Initialize resources
   selectedResources: [],
   reportFrequency: 'once',
   reportFormat: 'pdf',
   timeframe: null,
   emailReport: true,
   emailAddress: '',
-  
+
   // Initialize the store
   initialize: () => set({ initialized: true }),
-  
+
   // Navigation actions
   nextStep: () => {
     const { currentStep } = get();
@@ -73,45 +76,48 @@ export const useStore = create<WizardState>((set, get) => ({
       set({ currentStep: currentStep + 1 });
     }
   },
-  
+
   prevStep: () => {
     const { currentStep } = get();
     if (currentStep > 1) {
       set({ currentStep: currentStep - 1 });
     }
   },
-  
+
   setStep: (step: number) => {
     if (step >= 1 && step <= STEPS.length) {
       set({ currentStep: step });
     }
   },
-  
+
   // Data actions
   setSelectedProvider: (provider: CloudProvider) => set({ selectedProvider: provider }),
-  
+
   setReportType: (type: ReportType) => set({ reportType: type }),
-  
+
   setCredentials: (credentials: CredentialsWithAccountName) => set({ credentials }),
-  
+
+  setResources: (resources: Resource[]) => set({ resources: resources }), // Added setResources action
+
   setSelectedResources: (resources: Resource[]) => set({ selectedResources: resources }),
-  
+
   setReportFrequency: (frequency: ReportFrequency) => set({ reportFrequency: frequency }),
-  
+
   setReportFormat: (format: ReportFormat) => set({ reportFormat: format }),
-  
+
   setTimeframe: (timeframe: { year: number, month: number }) => set({ timeframe }),
-  
+
   setEmailReport: (emailReport: boolean) => set({ emailReport }),
-  
+
   setEmailAddress: (email: string) => set({ emailAddress: email }),
-  
+
   // Reset wizard state
   resetWizard: () => set({
     currentStep: 1,
     selectedProvider: null,
     reportType: null,
     credentials: null,
+    resources: [], // Reset resources
     selectedResources: [],
     reportFrequency: 'once',
     reportFormat: 'pdf',
@@ -119,11 +125,11 @@ export const useStore = create<WizardState>((set, get) => ({
     emailReport: true,
     emailAddress: '',
   }),
-  
+
   // Check if we can proceed to next step
   canProceed: () => {
     const { currentStep, selectedProvider, reportType, timeframe, credentials, selectedResources } = get();
-    
+
     switch (currentStep) {
       case 1: // Provider selection
         return !!selectedProvider;

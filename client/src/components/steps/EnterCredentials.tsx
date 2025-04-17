@@ -54,9 +54,10 @@ export function EnterCredentials() {
       const response = await apiRequest("POST", "/api/validate-aws-credentials", data);
       const result = await response.json()
 
-      if (result.valid) {
-        // Store both credentials and account name
+      if (result.valid && result.resources) {
+        // Store both credentials and resources
         setCredentials(data)
+        useStore.setState({ resources: result.resources })
         toast({
           title: "Credentials validated",
           description: "Your cloud credentials were validated successfully.",

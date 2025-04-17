@@ -36,16 +36,9 @@ export function SelectResources() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // Fetch resources based on selected provider
-  const { data: resources, isLoading, error } = useQuery<Resource[]>({
-    queryKey: [`/api/${selectedProvider}/resources`],
-    enabled: !!selectedProvider,
-    select: (data) => data.map(resource => ({
-      ...resource,
-      id: resource.resourceId,
-      selected: false
-    }))
-  });
+  const resources = useStore((state) => state.resources);
+  const isLoading = false;
+  const error = null;
 
   // Check if the resource is an EC2 instance or RDS instance
   const isEC2Instance = (resource: Resource) => 
@@ -65,13 +58,13 @@ export function SelectResources() {
             resource.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             resource.resourceId.toLowerCase().includes(searchQuery.toLowerCase())
           );
-          
+
           if (activeTab === "ec2") {
             return matchesSearch && isEC2Instance(resource);
           } else if (activeTab === "rds") {
             return matchesSearch && isRDSInstance(resource);
           }
-          
+
           return matchesSearch;
         }
       )
@@ -160,8 +153,8 @@ export function SelectResources() {
           <div className="border rounded-lg overflow-hidden">
             <div className="bg-muted px-4 py-3 text-sm font-medium grid grid-cols-12 gap-4">
               <div className="col-span-1"></div>
-              <div className="col-span-3">Instance ID</div>
-              <div className="col-span-3">Name</div>
+              <div className="col-span-3">{activeTab === "ec2" ? "Instance ID" : "Instance ID"}</div>
+              <div className="col-span-3">{activeTab === "ec2" ? "Name" : ""}</div>
               <div className="col-span-2">Region</div>
               <div className="col-span-1">Type</div>
               <div className="col-span-2">State</div>
@@ -196,10 +189,10 @@ export function SelectResources() {
                     />
                   </div>
                   <div className="col-span-3 font-mono text-sm">
-                    {formatResourceId(resource.resourceId)}
+                    {resource.resourceId}
                   </div>
-                  <div className="col-span-3 font-medium group-hover:text-blue-600 transition-colors">
-                    {resource.name}
+                  <div className="col-span-3">
+                    {activeTab === "ec2" ? resource.name : ""}
                   </div>
                   <div className="col-span-2">{resource.region}</div>
                   <div className="col-span-1">
@@ -231,7 +224,7 @@ export function SelectResources() {
                 of <span className="font-medium">{filteredResources.length}</span>{" "}
                 instances
               </div>
-              
+
               <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
