@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, FileCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -17,7 +17,7 @@ export function GenerateReport() {
 
   const { toast } = useToast();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState("");
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
 
   const handleGenerateReport = async () => {
     setIsGenerating(true);
@@ -29,7 +29,7 @@ export function GenerateReport() {
         reportType,
         resourceIds: selectedResources.map(r => r.resourceId),
         timeframe,
-        frequency: "once",
+        frequency: reportFrequency,
         format: "pdf",
         status: "pending",
       };
@@ -42,16 +42,16 @@ export function GenerateReport() {
       const result = await response.json();
 
       if (result.downloadUrl) {
-        setDownloadUrl(result.downloadUrl);
+        setReportUrl(result.downloadUrl);
         toast({
           title: "Report Generated",
-          description: "Your report has been successfully generated.",
+          description: "Your report has been generated successfully. Click the download button to save it.",
         });
       }
     } catch (error) {
       toast({
-        title: "Generation Error",
-        description: "There was a problem generating your report. Please try again.",
+        title: "Error",
+        description: "Failed to generate report. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -60,8 +60,9 @@ export function GenerateReport() {
   };
 
   const handleDownload = () => {
-    if (!downloadUrl) return;
-    window.open(downloadUrl, '_blank');
+    if (reportUrl) {
+      window.location.href = reportUrl;
+    }
   };
 
   return (
@@ -71,20 +72,32 @@ export function GenerateReport() {
           Generate Report
         </h2>
         <p className="text-muted-foreground mt-2">
-          Your cloud report is ready to be generated
+          Generate and download your cloud resource report
         </p>
       </div>
 
-      <div className="text-center">
-        {downloadUrl ? (
-          <Button onClick={handleDownload}>
-            <Download className="mr-2 h-4 w-4" />
-            Download Report
-          </Button>
-        ) : (
-          <Button onClick={handleGenerateReport} disabled={isGenerating}>
-            {isGenerating ? "Generating..." : "Generate Report"}
-          </Button>
+      <div className="flex flex-col items-center gap-4">
+        <Button
+          onClick={reportUrl ? handleDownload : handleGenerateReport}
+          disabled={isGenerating}
+          className="w-full max-w-md"
+          variant={reportUrl ? "outline" : "default"}
+        >
+          {isGenerating ? (
+            <>Generating Report...</>
+          ) : reportUrl ? (
+            <>
+              <Download className="mr-2 h-4 w-4" />
+              Download Report
+            </>
+          ) : (
+            <>Generate Report</>
+          )}
+        </Button>
+        {reportUrl && (
+          <p className="text-center text-green-600 font-medium">
+            Report generated successfully!
+          </p>
         )}
       </div>
     </div>

@@ -137,13 +137,16 @@ export async function validateAndListAwsResources({
 /**
  * Get EC2 instance utilization metrics
  */
+import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
+
 export async function getEC2InstanceMetrics({
   instanceId,
   accessKeyId,
   secretAccessKey,
   region = 'us-east-1',
   period = 3600, // 1 hour
-  days = 1
+  days = 1,
+  frequency = 'daily'
 }: {
   instanceId: string;
   accessKeyId: string;
@@ -151,14 +154,19 @@ export async function getEC2InstanceMetrics({
   region: string;
   period?: number;
   days?: number;
+  frequency?: 'daily' | 'weekly';
 }) {
   const credentials = { accessKeyId, secretAccessKey };
   const cloudwatch = new CloudWatchClient({ region, credentials });
-  
+
   const endTime = new Date();
   const startTime = new Date();
-  startTime.setDate(startTime.getDate() - days);
-  
+  if (frequency === 'weekly') {
+    startTime.setDate(startTime.getDate() - 7);
+  } else {
+    startTime.setDate(startTime.getDate() - 1);
+  }
+
   try {
     // Get CPU utilization
     const cpuParams = {
@@ -170,9 +178,9 @@ export async function getEC2InstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     const cpuData = await cloudwatch.send(new GetMetricStatisticsCommand(cpuParams));
-    
+
     // Get memory utilization for Linux (requires CloudWatch agent)
     const memParams = {
       MetricName: 'mem_used_percent',
@@ -183,7 +191,7 @@ export async function getEC2InstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     // This may fail if CloudWatch agent is not configured
     let memData = null;
     try {
@@ -191,7 +199,7 @@ export async function getEC2InstanceMetrics({
     } catch (err) {
       console.warn('Memory metrics not available:', err.message);
     }
-    
+
     // Get disk utilization for Linux (requires CloudWatch agent)
     const diskParams = {
       MetricName: 'disk_used_percent',
@@ -205,7 +213,7 @@ export async function getEC2InstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     // This may fail if CloudWatch agent is not configured
     let diskData = null;
     try {
@@ -213,7 +221,7 @@ export async function getEC2InstanceMetrics({
     } catch (err) {
       console.warn('Disk metrics not available:', err.message);
     }
-    
+
     return {
       cpu: cpuData,
       memory: memData,
@@ -234,7 +242,8 @@ export async function getRDSInstanceMetrics({
   secretAccessKey,
   region = 'us-east-1',
   period = 3600, // 1 hour
-  days = 1
+  days = 1,
+  frequency = 'daily'
 }: {
   instanceId: string;
   accessKeyId: string;
@@ -242,14 +251,19 @@ export async function getRDSInstanceMetrics({
   region: string;
   period?: number;
   days?: number;
+  frequency?: 'daily' | 'weekly';
 }) {
   const credentials = { accessKeyId, secretAccessKey };
   const cloudwatch = new CloudWatchClient({ region, credentials });
-  
+
   const endTime = new Date();
   const startTime = new Date();
-  startTime.setDate(startTime.getDate() - days);
-  
+  if (frequency === 'weekly') {
+    startTime.setDate(startTime.getDate() - 7);
+  } else {
+    startTime.setDate(startTime.getDate() - 1);
+  }
+
   try {
     // Get CPU utilization
     const cpuParams = {
@@ -261,9 +275,9 @@ export async function getRDSInstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     const cpuData = await cloudwatch.send(new GetMetricStatisticsCommand(cpuParams));
-    
+
     // Get database connections
     const connectionsParams = {
       MetricName: 'DatabaseConnections',
@@ -274,9 +288,9 @@ export async function getRDSInstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     const connectionsData = await cloudwatch.send(new GetMetricStatisticsCommand(connectionsParams));
-    
+
     // Get free storage space
     const storageParams = {
       MetricName: 'FreeStorageSpace',
@@ -287,9 +301,9 @@ export async function getRDSInstanceMetrics({
       StartTime: startTime,
       EndTime: endTime
     };
-    
+
     const storageData = await cloudwatch.send(new GetMetricStatisticsCommand(storageParams));
-    
+
     return {
       cpu: cpuData,
       connections: connectionsData,
@@ -319,12 +333,12 @@ export async function generateUtilizationPDF({
   // 1. Fetch utilization data for each resource
   // 2. Generate graphs for CPU, memory, disk usage
   // 3. Create a PDF with reportlab (or in Node.js use PDFKit)
-  
+
   // For demo purposes, we'll just generate a static URL
   const timestamp = new Date().getTime();
   const filename = `aws-utilization-report-${cloudAccountId}-${timestamp}.pdf`;
   const downloadUrl = `/reports/${filename}`;
-  
+
   return {
     reportId: timestamp,
     downloadUrl: downloadUrl
