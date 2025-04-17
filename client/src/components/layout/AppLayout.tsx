@@ -17,11 +17,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          <a 
-            href="https://www.nubinix.com" 
-            target="_blank" 
+          <a
+            href="https://www.nubinix.com"
+            target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="text-sm font-medium bg-gradient-to-r from-[#3DB3E3] via-[#6866C1] to-[#E865A0] bg-clip-text text-transparent drop-shadow-md"
           >
             www.nubinix.com
           </a>
@@ -41,13 +41,28 @@ export function AppLayout({ children }: AppLayoutProps) {
             </span>
           </div>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a
+              href="https://nubinix.com/privacy-policy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-white hover:text-gray-300"
+            >
               Privacy Policy
             </a>
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a
+              href="https://nubinix.com/terms-of-use/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-white hover:text-gray-300"
+            >
               Terms of Service
             </a>
-            <a href="#" className="text-sm text-white hover:text-gray-300">
+            <a
+              href="https://nubinix.com/contact-us/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-white hover:text-gray-300"
+            >
               Contact Us
             </a>
           </div>
@@ -56,3 +71,4 @@ export function AppLayout({ children }: AppLayoutProps) {
     </div>
   );
 }
+
