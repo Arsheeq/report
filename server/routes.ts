@@ -3,9 +3,9 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { insertReportSchema } from "@shared/schema";
-import { validateAndListAwsResources, generateUtilizationPDF as generateAwsUtilizationReport } from "./aws-services";
 import fs from 'fs';
 import path from 'path';
+import { validateAndListAwsResources } from './aws-services';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // prefix all routes with /api
@@ -126,116 +126,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'pending'
       });
 
-      const { cloudAccountId, resourceIds, frequency = 'daily' } = reportData;
+      const { cloudAccountId, resourceIds } = reportData;
 
-      // Get the cloud account for API calls
+      // Get the cloud account
       const cloudAccount = await storage.getCloudAccount(cloudAccountId);
       if (!cloudAccount) {
         return res.status(404).json({ message: "Cloud account not found" });
       }
 
-      // Get cloud account credentials
-      const credentials = cloudAccount.credentials as any;
-      const { accessKeyId, secretAccessKey, region } = credentials;
+      // Call Python service
+      if (!cloudAccount?.credentials) {
+        throw new Error('Cloud account credentials not found');
+      }
 
-
-      // Create reports directory if it doesn't exist
-      const reportsDir = path.join(process.cwd(), 'public', 'reports');
-      fs.mkdirSync(reportsDir, { recursive: true });
-
-      // Get account and resources data
-      const account = await storage.getCloudAccount(cloudAccountId);
-      const resources = await storage.getResourcesByCloudAccountId(cloudAccountId);
-
-      // Get metrics data from AWS
-      const metrics = await getResourceMetrics(cloudAccountId, resourceIds, frequency);
-
-      // Format metrics for Python
-      const metricsData = metrics.map(resource => ({
-        service_type: resource.service_type,
-        id: resource.id,
-        name: resource.name,
-        type: resource.type,
-        platform: resource.platform,
-        state: resource.state,
-        engine: resource.engine,
-        metrics: resource.metrics
-      }));
-
-      // Generate meaningful filename
-      const timestamp = new Date().getTime();
-      const safeAccountName = account?.credentials?.accountName?.replace(/[^a-zA-Z0-9-]/g, '-') || 'aws-account';
-      const formattedDate = new Date().toISOString().split('T')[0];
-      const filename = `${safeAccountName}-utilization-report-${formattedDate}-${timestamp}.pdf`;
-      const filePath = path.join(reportsDir, filename);
-
-      // Spawn Python process to generate report
-      const { spawn } = await import('child_process');
-      const scriptPath = path.join(process.cwd(), 'server', 'report_generator.py');
-
-      // Create a structured input object for Python
-      const inputData = {
-        account_name: account?.credentials?.accountName || 'AWS Account',
-        metrics_data: metricsData,
-        output_file: filePath
-      };
-
-      const pythonProcess = spawn('python3', [
-        scriptPath,
-        JSON.stringify(inputData)
-      ], {
-        timeout: 300000 // 5 minute timeout
+      const response = await fetch('http://0.0.0.0:5001/generate-utilization-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cloudAccountId,
+          resourceIds: await Promise.all(resourceIds.map(async id => {
+            const resource = await storage.getResourceByResourceId(id);
+            if (!resource) {
+              throw new Error(`Resource not found: ${id}`);
+            }
+            const serviceType = id.startsWith('i-') ? 'EC2' : 'RDS';
+            return `${serviceType}|${id}|${resource.region}`;
+          })),
+          accountName: cloudAccount.credentials.accountName || 'AWS Account',
+          aws_access_key: cloudAccount.credentials.accessKeyId,
+          aws_secret_key: cloudAccount.credentials.secretAccessKey,
+          frequency: reportData.frequency || 'daily',
+          period: reportData.frequency === 'weekly' ? 7 : 1
+        })
       });
 
-      // Collect errors
-      let errorData = [];
-      pythonProcess.stderr.on('data', (data) => {
-        errorData.push(data);
-      });
+      if (!response.ok) {
+        throw new Error(`Failed to generate report: ${response.statusText}`);
+      }
 
-      // Wait for Python process to complete
-      await new Promise((resolve, reject) => {
-        pythonProcess.on('close', (code) => {
-          if (code === 0) {
-            resolve();
-          } else {
-            const errorMessage = Buffer.concat(errorData).toString();
-            reject(new Error(`Failed to generate report: ${errorMessage}`));
-          }
-        });
-      });
-
-      // Write PDF to file
-      fs.writeFileSync(filePath, await new Promise((resolve, reject) => {
-        let pdfData = [];
-        pythonProcess.stdout.on('data', (data) => {
-          pdfData.push(data);
-        });
-        pythonProcess.on('close', (code) => {
-          if (code === 0) {
-            resolve(Buffer.concat(pdfData));
-          } else {
-            const errorMessage = Buffer.concat(errorData).toString();
-            reject(new Error(`Failed to generate report: ${errorMessage}`));
-          }
-        });
-      }));
+      const result = await response.json();
 
       // Create report in storage
       const report = await storage.createReport(reportData);
 
       // Update report status with download URL
       if (report.id) {
-        await storage.updateReportStatus(report.id, 'completed', `/reports/${filename}`);
+        await storage.updateReportStatus(report.id, 'completed', result.downloadUrl);
       }
 
       return res.status(200).json({
-        reportId: timestamp,
-        downloadUrl: `/reports/${filename}`
+        reportId: report.id,
+        downloadUrl: result.downloadUrl
       });
     } catch (error) {
       console.error("Error generating utilization report:", error);
-      return res.status(400).json({ message: "Invalid report data" });
+      return res.status(400).json({ message: "Failed to generate report" });
     }
   });
 

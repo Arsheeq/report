@@ -89,6 +89,7 @@ def get_cloudwatch_metric_data(cloudwatch, metric_name, namespace, dimensions, p
     """Get CloudWatch metric data for the specified period."""
     end_time = datetime.utcnow()
     start_time = end_time - timedelta(days=period_days)
+    logger.info(f"Fetching metrics for {metric_name} from {start_time} to {end_time}")
     
     try:
         response = cloudwatch.get_metric_statistics(
@@ -305,6 +306,10 @@ def get_rds_metrics(aws_access_key, aws_secret_key, instance_id, region, period_
 
 def get_instance_metrics(aws_access_key, aws_secret_key, resource_list, period_days):
     """Get metrics for the selected EC2 and RDS instances."""
+    logger.info(f"Getting metrics with period: {period_days} days")
+    if not aws_access_key or not aws_secret_key:
+        logger.error("AWS credentials are missing")
+        raise ValueError("AWS credentials are required")
     metrics_data = []
     
     for resource in resource_list:
