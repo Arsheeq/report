@@ -61,7 +61,9 @@ export function GenerateReport() {
 
   const handleDownload = () => {
     if (reportUrl) {
-      window.location.href = reportUrl;
+      // Use absolute path and handle download in new tab
+      const absoluteUrl = `${window.location.origin}${reportUrl}`;
+      window.open(absoluteUrl, '_blank');
     }
   };
 

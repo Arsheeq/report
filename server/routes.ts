@@ -143,49 +143,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const reportsDir = path.join(process.cwd(), 'public', 'reports');
       fs.mkdirSync(reportsDir, { recursive: true });
 
-      // Generate unique filename
+      // Get account and resources data
+      const account = await storage.getCloudAccount(cloudAccountId);
+      const resources = await storage.getResourcesByCloudAccountId(cloudAccountId);
+
+      // Get metrics data from AWS
+      const { accessKeyId, secretAccessKey, region } = credentials;
+      const resourceStrings = resourceIds.map(id => {
+        const resource = resources.find(r => r.resourceId === id);
+        return `${resource?.type.startsWith('EC2') ? 'EC2' : 'RDS'}|${id}|${region}`;
+      });
+
+      const periodDays = frequency === 'weekly' ? 7 : 1;
+      const metrics = await import('./aws_utils').then(mod => 
+        mod.get_instance_metrics(accessKeyId, secretAccessKey, resourceStrings, periodDays)
+      );
+
+      // Format metrics for Python
+      const metricsData = metrics.map(resource => ({
+        service_type: resource.service_type,
+        id: resource.id,
+        name: resource.name,
+        type: resource.type,
+        platform: resource.platform,
+        state: resource.state,
+        engine: resource.engine,
+        metrics: resource.metrics
+      }));
+
+      // Generate meaningful filename
       const timestamp = new Date().getTime();
-      const filename = `aws-utilization-report-${timestamp}.pdf`;
+      const safeAccountName = account?.credentials?.accountName?.replace(/[^a-zA-Z0-9-]/g, '-') || 'aws-account';
+      const formattedDate = new Date().toISOString().split('T')[0];
+      const filename = `${safeAccountName}-utilization-report-${formattedDate}-${timestamp}.pdf`;
       const filePath = path.join(reportsDir, filename);
 
-      // Generate PDF report using the aws-utilization-pdf module
-      // Generate PDF report using the aws-utilization-pdf module
-      const { reportId, downloadUrl } = await generateAwsUtilizationReport({
-        cloudAccountId,
-        resourceIds,
-        timeframe: frequency === 'weekly' ? { days: 7 } : { days: 1 },
-        format: 'pdf'
+      // Spawn Python process to generate report
+      const { spawn } = await import('child_process');
+      const scriptPath = path.join(process.cwd(), 'server', 'report_generator.py');
+      
+      // Create a structured input object for Python
+      const inputData = {
+        account_name: account?.credentials?.accountName || 'AWS Account',
+        metrics_data: metricsData,
+        output_file: filePath
+      };
+
+      const pythonProcess = spawn('python3', [
+        scriptPath,
+        JSON.stringify(inputData)
+      ], {
+        timeout: 300000 // 5 minute timeout
       });
 
-      // Return report info
-      return res.status(200).json({
-        reportId,
-        downloadUrl
-      });
-      return res.status(200).json({
-        reportId: timestamp,
-        downloadUrl: `/reports/${filename}`
+      // Collect errors
+      let errorData = [];
+      pythonProcess.stderr.on('data', (data) => {
+        errorData.push(data);
       });
 
+      // Wait for Python process to complete
+      await new Promise((resolve, reject) => {
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve();
+          } else {
+            const errorMessage = Buffer.concat(errorData).toString();
+            reject(new Error(`Failed to generate report: ${errorMessage}`));
+          }
+        });
+      });
+
+      // Write PDF to file
+      fs.writeFileSync(filePath, await new Promise((resolve, reject) => {
+        let pdfData = [];
+        pythonProcess.stdout.on('data', (data) => {
+          pdfData.push(data);
+        });
+        pythonProcess.on('close', (code) => {
+          if (code === 0) {
+            resolve(Buffer.concat(pdfData));
+          } else {
+            const errorMessage = Buffer.concat(errorData).toString();
+            reject(new Error(`Failed to generate report: ${errorMessage}`));
+          }
+        });
+      }));
 
       // Create report in storage
       const report = await storage.createReport(reportData);
 
-      // Simulate report generation with actual provider data
-      setTimeout(async () => {
-        // In a real app, this would use the actual cloud provider SDK
-        const provider = cloudAccount.provider;
+      // Update report status with download URL
+      if (report.id) {
+        await storage.updateReportStatus(report.id, 'completed', `/reports/${filename}`);
+      }
 
-        // Create a descriptive filename
-        const downloadUrl = `/reports/${provider}-utilization-${report.id}.pdf`;
-
-        // Ensure we have a valid report ID
-        if (report.id) {
-          await storage.updateReportStatus(report.id, 'completed', downloadUrl);
-        }
-      }, 3000);
-
-      return res.status(201).json(report);
+      return res.status(200).json({
+        reportId: timestamp,
+        downloadUrl: `/reports/${filename}`
+      });
     } catch (error) {
       console.error("Error generating utilization report:", error);
       return res.status(400).json({ message: "Invalid report data" });
