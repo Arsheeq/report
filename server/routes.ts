@@ -3,8 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { insertReportSchema } from "@shared/schema";
-import { validateAndListAwsResources } from "./aws-services";
-import { generateUtilizationPDF as generateAwsUtilizationReport } from "./aws-services";
+import { validateAndListAwsResources, generateUtilizationPDF as generateAwsUtilizationReport } from "./aws-services";
 import fs from 'fs';
 import path from 'path';
 
@@ -139,6 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const credentials = cloudAccount.credentials as any;
       const { accessKeyId, secretAccessKey, region } = credentials;
 
+
       // Create reports directory if it doesn't exist
       const reportsDir = path.join(process.cwd(), 'public', 'reports');
       fs.mkdirSync(reportsDir, { recursive: true });
@@ -148,16 +148,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const resources = await storage.getResourcesByCloudAccountId(cloudAccountId);
 
       // Get metrics data from AWS
-      const { accessKeyId, secretAccessKey, region } = credentials;
-      const resourceStrings = resourceIds.map(id => {
-        const resource = resources.find(r => r.resourceId === id);
-        return `${resource?.type.startsWith('EC2') ? 'EC2' : 'RDS'}|${id}|${region}`;
-      });
-
-      const periodDays = frequency === 'weekly' ? 7 : 1;
-      const metrics = await import('./aws_utils').then(mod => 
-        mod.get_instance_metrics(accessKeyId, secretAccessKey, resourceStrings, periodDays)
-      );
+      const metrics = await getResourceMetrics(cloudAccountId, resourceIds, frequency);
 
       // Format metrics for Python
       const metricsData = metrics.map(resource => ({
@@ -181,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Spawn Python process to generate report
       const { spawn } = await import('child_process');
       const scriptPath = path.join(process.cwd(), 'server', 'report_generator.py');
-      
+
       // Create a structured input object for Python
       const inputData = {
         account_name: account?.credentials?.accountName || 'AWS Account',

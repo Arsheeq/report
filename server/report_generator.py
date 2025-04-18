@@ -1,3 +1,4 @@
+
 import io
 import os
 import logging
@@ -140,8 +141,6 @@ def generate_pdf_report(account_name, metrics_data):
         fontSize=12,
         spaceAfter=6
     ))
-    # Do not redefine 'Normal' style as it already exists in the stylesheet
-    # Modify it instead if needed
     styles['Normal'].fontSize = 10
     styles['Normal'].spaceAfter = 6
     

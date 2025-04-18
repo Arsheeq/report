@@ -134,183 +134,48 @@ export async function validateAndListAwsResources({
   }
 }
 
-/**
- * Get EC2 instance utilization metrics
- */
-import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
+import { PythonShell } from 'python-shell';
+import path from 'path';
 
-export async function getEC2InstanceMetrics({
-  instanceId,
-  accessKeyId,
-  secretAccessKey,
-  region = 'us-east-1',
-  period = 3600, // 1 hour
-  days = 1,
-  frequency = 'daily'
-}: {
-  instanceId: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  region: string;
-  period?: number;
-  days?: number;
-  frequency?: 'daily' | 'weekly';
-}) {
-  const credentials = { accessKeyId, secretAccessKey };
-  const cloudwatch = new CloudWatchClient({ region, credentials });
-
-  const endTime = new Date();
-  const startTime = new Date();
-  if (frequency === 'weekly') {
-    startTime.setDate(startTime.getDate() - 7);
-  } else {
-    startTime.setDate(startTime.getDate() - 1);
-  }
-
+export async function getResourceMetrics(cloudAccountId: number, resourceIds: string[], frequency: string = 'daily') {
   try {
-    // Get CPU utilization
-    const cpuParams = {
-      MetricName: 'CPUUtilization',
-      Namespace: 'AWS/EC2',
-      Period: period,
-      Statistics: ['Average' as Statistic],
-      Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
-      StartTime: startTime,
-      EndTime: endTime
-    };
-
-    const cpuData = await cloudwatch.send(new GetMetricStatisticsCommand(cpuParams));
-
-    // Get memory utilization for Linux (requires CloudWatch agent)
-    const memParams = {
-      MetricName: 'mem_used_percent',
-      Namespace: 'CWAgent',
-      Period: period,
-      Statistics: ['Average'],
-      Dimensions: [{ Name: 'InstanceId', Value: instanceId }],
-      StartTime: startTime,
-      EndTime: endTime
-    };
-
-    // This may fail if CloudWatch agent is not configured
-    let memData = null;
-    try {
-      memData = await cloudwatch.send(new GetMetricStatisticsCommand(memParams));
-    } catch (err) {
-      console.warn('Memory metrics not available:', err.message);
+    // Get cloud account credentials
+    const cloudAccount = await storage.getCloudAccount(cloudAccountId);
+    if (!cloudAccount) {
+      throw new Error('Cloud account not found');
     }
 
-    // Get disk utilization for Linux (requires CloudWatch agent)
-    const diskParams = {
-      MetricName: 'disk_used_percent',
-      Namespace: 'CWAgent',
-      Period: period,
-      Statistics: ['Average'],
-      Dimensions: [
-        { Name: 'InstanceId', Value: instanceId },
-        { Name: 'path', Value: '/' } // Root path
-      ],
-      StartTime: startTime,
-      EndTime: endTime
+    const credentials = cloudAccount.credentials as any;
+    const periodDays = frequency === 'weekly' ? 7 : 1;
+
+    // Call Python script to get metrics
+    const options = {
+      mode: 'json',
+      pythonPath: 'python3',
+      scriptPath: path.join(process.cwd(), 'server'),
+      args: [
+        JSON.stringify({
+          aws_access_key: credentials.accessKeyId,
+          aws_secret_key: credentials.secretAccessKey,
+          resource_list: resourceIds.map(id => {
+            const [type, resourceId, region] = id.split('|');
+            return `${type}|${resourceId}|${region}`;
+          }),
+          period_days: periodDays
+        })
+      ]
     };
 
-    // This may fail if CloudWatch agent is not configured
-    let diskData = null;
-    try {
-      diskData = await cloudwatch.send(new GetMetricStatisticsCommand(diskParams));
-    } catch (err) {
-      console.warn('Disk metrics not available:', err.message);
-    }
+    const metricsData = await new Promise((resolve, reject) => {
+      PythonShell.run('aws_utils.py', options, (err, results) => {
+        if (err) reject(err);
+        resolve(results?.[0]);
+      });
+    });
 
-    return {
-      cpu: cpuData,
-      memory: memData,
-      disk: diskData
-    };
+    return metricsData;
   } catch (error) {
-    console.error('Error getting EC2 metrics:', error);
-    throw error;
-  }
-}
-
-/**
- * Get RDS instance utilization metrics
- */
-export async function getRDSInstanceMetrics({
-  instanceId,
-  accessKeyId,
-  secretAccessKey,
-  region = 'us-east-1',
-  period = 3600, // 1 hour
-  days = 1,
-  frequency = 'daily'
-}: {
-  instanceId: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-  region: string;
-  period?: number;
-  days?: number;
-  frequency?: 'daily' | 'weekly';
-}) {
-  const credentials = { accessKeyId, secretAccessKey };
-  const cloudwatch = new CloudWatchClient({ region, credentials });
-
-  const endTime = new Date();
-  const startTime = new Date();
-  if (frequency === 'weekly') {
-    startTime.setDate(startTime.getDate() - 7);
-  } else {
-    startTime.setDate(startTime.getDate() - 1);
-  }
-
-  try {
-    // Get CPU utilization
-    const cpuParams = {
-      MetricName: 'CPUUtilization',
-      Namespace: 'AWS/RDS',
-      Period: period,
-      Statistics: ['Average'],
-      Dimensions: [{ Name: 'DBInstanceIdentifier', Value: instanceId }],
-      StartTime: startTime,
-      EndTime: endTime
-    };
-
-    const cpuData = await cloudwatch.send(new GetMetricStatisticsCommand(cpuParams));
-
-    // Get database connections
-    const connectionsParams = {
-      MetricName: 'DatabaseConnections',
-      Namespace: 'AWS/RDS',
-      Period: period,
-      Statistics: ['Average'],
-      Dimensions: [{ Name: 'DBInstanceIdentifier', Value: instanceId }],
-      StartTime: startTime,
-      EndTime: endTime
-    };
-
-    const connectionsData = await cloudwatch.send(new GetMetricStatisticsCommand(connectionsParams));
-
-    // Get free storage space
-    const storageParams = {
-      MetricName: 'FreeStorageSpace',
-      Namespace: 'AWS/RDS',
-      Period: period,
-      Statistics: ['Average'],
-      Dimensions: [{ Name: 'DBInstanceIdentifier', Value: instanceId }],
-      StartTime: startTime,
-      EndTime: endTime
-    };
-
-    const storageData = await cloudwatch.send(new GetMetricStatisticsCommand(storageParams));
-
-    return {
-      cpu: cpuData,
-      connections: connectionsData,
-      storage: storageData
-    };
-  } catch (error) {
-    console.error('Error getting RDS metrics:', error);
+    console.error('Error getting resource metrics:', error);
     throw error;
   }
 }
@@ -330,7 +195,7 @@ export async function generateUtilizationPDF({
   credentials: any;
 }) {
   // In a real app, you would:
-  // 1. Fetch utilization data for each resource
+  // 1. Fetch utilization data for each resource using getResourceMetrics
   // 2. Generate graphs for CPU, memory, disk usage
   // 3. Create a PDF with reportlab (or in Node.js use PDFKit)
 
@@ -344,9 +209,3 @@ export async function generateUtilizationPDF({
     downloadUrl: downloadUrl
   };
 }
-
-import {
-  CloudWatchClient,
-  GetMetricStatisticsCommand,
-  Statistic
-} from '@aws-sdk/client-cloudwatch';
